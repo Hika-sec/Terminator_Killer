@@ -13,7 +13,6 @@ A collection of kernel-mode process termination tools leveraging vulnerable driv
 | `terminator.cpp` | Original implementation |
 | `ProcessMonitorDriver.sys` | STProcessMonitorDriver sample (included) |
 | `ilbwasys.sys` / `libwasys.sys` | libwasys driver samples |
-| `terminator.exe` | Precompiled binary |
 
 ## Compilation
 
