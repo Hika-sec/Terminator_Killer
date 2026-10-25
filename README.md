@@ -125,16 +125,6 @@ terminator_MonProcessControl.exe -proc antivirus.exe
 
 For MonProcessControl, relocation messages appear first if not already in the expected path.
 
-## Affected Versions (STProcessMonitorDriver)
-
-Tested vulnerable versions:
-| Version | SHA-256 |
-|---------|---------|
-| 11.11.4.0 | `70bcec00c215fe52779700f74e9bd669ff836f594df92381cbfb7ee0568e7a8b` |
-| 10.5.75.0 | `85d21ad0e0b43d122f3c9ec06036b08398635860c93d764f72fb550fb44cf786` |
-
-Other versions may be affected; verify the driver's IOCTL handler before use.
-
 ## Disclaimer
 
 > **This tool is for authorized security research and red team exercises only.**
