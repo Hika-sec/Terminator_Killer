@@ -20,17 +20,17 @@ Requires MinGW-w64 (GCC) on Windows. Compile individual variants:
 
 ### STProcessMonitorDriver
 ```powershell
-g++ --% .\terminator_STProcessMonitorDriver.cpp -o terminator_STProcessMonitor.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
+g++ --% src\terminator_STProcessMonitorDriver.cpp -o terminator_STProcessMonitor.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
 ```
 
 ### libwasys.sys (WasysControl)
 ```powershell
-g++ --% .\Terminator_libwasys.cpp -o terminator_libwasys.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
+g++ --% src\Terminator_libwasys.cpp -o terminator_libwasys.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
 ```
 
 ### MonProcessControl.sys
 ```powershell
-g++ --% .\terminator_MonProcessControl.cpp -o terminator_MonProcessControl.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
+g++ --% src\terminator_MonProcessControl.cpp -o terminator_MonProcessControl.exe -Oz -ffunction-sections -fdata-sections -static -static-libgcc -static-libstdc++ -Wl,--gc-sections -W
 ```
 
 Flags breakdown:
